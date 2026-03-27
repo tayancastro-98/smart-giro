@@ -86,14 +86,14 @@ export const computeRanking = (teams: Team[], matches: Match[], allSets: SetReco
     if (b.sets_won !== a.sets_won) return b.sets_won - a.sets_won;
     // 2. Sets Lost (lower is better)
     if (a.sets_lost !== b.sets_lost) return a.sets_lost - b.sets_lost;
-    // 3. Total Points Conceded (lower is better)
-    if (a.points_conceded !== b.points_conceded) return a.points_conceded - b.points_conceded;
-    // 4. Last Set Points Conceded (lower is better)
-    if (a.last_set_points_conceded !== b.last_set_points_conceded) return a.last_set_points_conceded - b.last_set_points_conceded;
-    // 5. Total Points Scored (higher is better)
+    // 3. Total Points Scored (higher is better)
     if (b.total_points_scored !== a.total_points_scored) return b.total_points_scored - a.total_points_scored;
-    // 6. Last Set Points Scored (higher is better)
+    // 4. Total Points Conceded (lower is better)
+    if (a.points_conceded !== b.points_conceded) return a.points_conceded - b.points_conceded;
+    // 5. Last Set Points Scored (higher is better)
     if (b.last_set_points !== a.last_set_points) return b.last_set_points - a.last_set_points;
+    // 6. Last Set Points Conceded (lower is better)
+    if (a.last_set_points_conceded !== b.last_set_points_conceded) return a.last_set_points_conceded - b.last_set_points_conceded;
     // 7. Penalties (lower is better)
     return a.penalties - b.penalties;
   });

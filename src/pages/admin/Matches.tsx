@@ -198,35 +198,23 @@ export function Matches() {
 
                       <div className="space-y-3">
                         <div className="space-y-1">
-                          {phase === 1 ? (
-                            <select 
-                              value={match.team_a_id || ''}
-                              onChange={(e) => handleAssignTeam(match.id, 'team_a_id', e.target.value)}
-                              className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded-lg"
-                            >
-                              <option value="">Selecione Time A</option>
-                              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
-                          ) : (
-                            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium">
-                              {match.team_a?.name || (phase === 2 && match.match_number === 6 ? 'A definir: 1MV' : 'A definir...')}
-                            </div>
-                          )}
+                          <select 
+                            value={match.team_a_id || ''}
+                            onChange={(e) => handleAssignTeam(match.id, 'team_a_id', e.target.value)}
+                            className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded-lg"
+                          >
+                            <option value="">{phase === 1 ? 'Selecione Time A' : (match.team_a?.name || 'A definir...')}</option>
+                            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
                           <div className="text-center text-[10px] font-bold text-slate-400">VS</div>
-                          {phase === 1 ? (
-                            <select 
-                              value={match.team_b_id || ''}
-                              onChange={(e) => handleAssignTeam(match.id, 'team_b_id', e.target.value)}
-                              className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded-lg"
-                            >
-                              <option value="">Selecione Time B</option>
-                              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
-                          ) : (
-                            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium">
-                              {match.team_b?.name || (phase === 2 && match.match_number === 6 ? 'A definir: MC' : 'A definir...')}
-                            </div>
-                          )}
+                          <select 
+                            value={match.team_b_id || ''}
+                            onChange={(e) => handleAssignTeam(match.id, 'team_b_id', e.target.value)}
+                            className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded-lg"
+                          >
+                            <option value="">{phase === 1 ? 'Selecione Time B' : (match.team_b?.name || 'A definir...')}</option>
+                            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
                         </div>
                       </div>
 
