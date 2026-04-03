@@ -108,35 +108,64 @@ export function Matches() {
     if (!selectedCategory) return;
     
     const confirmMsg = matches.length > 0 
-      ? 'Atenção: Já existem partidas geradas. Gerar novas partidas pode duplicar ou causar conflitos se não forem removidas. Deseja continuar?'
+      ? 'Atenção: Já existem partidas geradas. Ao clicar em "Sim", TODOS os placares e partidas atuais desta categoria serão APAGADOS para criar a nova estrutura. Deseja continuar?'
       : 'Deseja gerar as partidas para esta categoria?';
     
     if (!window.confirm(confirmMsg)) return;
 
     try {
       setMatchesLoading(true);
+      
+      // 1. CLEANUP: Delete existing matches and sets for this category
+      const { data: existingMatches } = await supabase
+        .from('matches')
+        .select('id')
+        .eq('category_id', selectedCategoryId);
+      
+      const existingMatchIds = existingMatches?.map(m => m.id) || [];
+      if (existingMatchIds.length > 0) {
+        // Delete sets first due to foreign key constraints
+        const { error: sDelError } = await supabase.from('sets').delete().in('match_id', existingMatchIds);
+        if (sDelError) throw sDelError;
+        
+        const { error: mDelError } = await supabase.from('matches').delete().in('id', existingMatchIds);
+        if (mDelError) throw mDelError;
+      }
+
       let newMatches = [];
 
       if (selectedCategory.tournament_format === 'GROUPS') {
-        // We need to ensure teams have groups assigned
-        if (teams.some(t => !t.group_name)) {
-          if (window.confirm('Algumas equipes não têm grupo atribuído. Deseja sortear os grupos automaticamente agora?')) {
-            const groups = createGroups(teams, selectedCategory.group_size || 3);
-            for (const g of groups) {
-              for (const t of g.teams) {
-                await supabase.from('teams').update({ group_name: g.name }).eq('id', t.id);
-              }
+        const needsRerandomize = teams.some(t => !t.group_name) || window.confirm('Equipes já têm grupos. Deseja sortear novamente as equipes de forma aleatória?');
+        
+        if (needsRerandomize) {
+          const groups = createGroups(teams, selectedCategory.group_size || 3);
+          
+          // Batch update teams with group names using upsert
+          const teamUpdates = groups.flatMap(g => 
+            g.teams.map(t => ({ 
+              id: t.id, 
+              group_name: g.name, 
+              category_id: selectedCategory.id,
+              name: t.name
+            }))
+          );
+          
+          const { error: tUpdateError } = await supabase.from('teams').upsert(teamUpdates);
+          if (tUpdateError) throw tUpdateError;
+
+          // Re-fetch teams to get updated data
+          const { data: updatedTeams } = await supabase.from('teams').select('*').eq('category_id', selectedCategory.id);
+          const groupMap: Record<string, Team[]> = {};
+          (updatedTeams || []).forEach(t => {
+            if (t.group_name) {
+              if (!groupMap[t.group_name]) groupMap[t.group_name] = [];
+              groupMap[t.group_name].push(t);
             }
-            // Re-fetch teams to get assigned group names
-            const { data: updatedTeams } = await supabase.from('teams').select('*').eq('category_id', selectedCategory.id);
-            const updatedGroups = createGroups(updatedTeams || [], selectedCategory.group_size || 3); // This is slightly redundant but safe
-            newMatches = generateGroupStage(selectedCategory.id, updatedGroups);
-          } else {
-            setMatchesLoading(false);
-            return;
-          }
+          });
+          const updatedGroups = Object.entries(groupMap).map(([name, teams]) => ({ name, teams }));
+          newMatches = generateGroupStage(selectedCategory.id, updatedGroups);
         } else {
-          // Reconstruct group structure from teams
+          // Reconstruct group structure from existing team group_names
           const groupMap: Record<string, Team[]> = {};
           teams.forEach(t => {
             if (t.group_name) {
@@ -152,12 +181,12 @@ export function Matches() {
       }
 
       if (!newMatches || newMatches.length === 0) {
-        alert('Não foi possível gerar partidas. Verifique se há equipes cadastradas.');
+        alert('Não foi possível gerar partidas. Verifique se há equipes suficientes cadastradas.');
         return;
       }
 
-      // Upsert matches
-      const { error } = await supabase.from('matches').upsert(
+      // 3. INSERT NEW MATCHES (No longer using upsert to avoid conflicts with deleted IDs if any)
+      const { error: mInsertError } = await supabase.from('matches').insert(
         newMatches.map(m => ({
           category_id: m.category_id,
           phase: m.phase,
@@ -166,20 +195,19 @@ export function Matches() {
           team_b_id: m.team_b_id,
           group_name: m.group_name,
           status: 'PENDING'
-        })), 
-        { onConflict: 'category_id,match_number' }
+        }))
       );
       
-      if (error) throw error;
+      if (mInsertError) throw mInsertError;
       
-      // Update category phase to 1
+      // Update category state
       await supabase.from('categories').update({ current_phase: 1, status: 'ONGOING' }).eq('id', selectedCategory.id);
       
-      alert(`${newMatches.length} partidas geradas com sucesso!`);
+      alert(`${newMatches.length} partidas geradas do zero com sucesso!`);
       fetchMatchesAndTeams(selectedCategoryId);
-    } catch (error) {
-      console.error(error);
-      alert('Erro ao gerar partidas');
+    } catch (error: any) {
+      console.error('Error generating matches:', error);
+      alert(`Erro ao gerar partidas: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setMatchesLoading(false);
     }
