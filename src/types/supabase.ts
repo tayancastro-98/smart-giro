@@ -16,29 +16,41 @@ export type Database = {
     Tables: {
       categories: {
         Row: {
+          advancement_rule: Json | null
           created_at: string | null
           current_phase: number
           gender: string
+          group_size: number | null
           id: string
           status: string
+          tie_breaker_config: Json | null
+          tournament_format: string | null
           tournament_id: string
           updated_at: string | null
         }
         Insert: {
+          advancement_rule?: Json | null
           created_at?: string | null
           current_phase?: number
           gender: string
+          group_size?: number | null
           id?: string
           status?: string
+          tie_breaker_config?: Json | null
+          tournament_format?: string | null
           tournament_id: string
           updated_at?: string | null
         }
         Update: {
+          advancement_rule?: Json | null
           created_at?: string | null
           current_phase?: number
           gender?: string
+          group_size?: number | null
           id?: string
           status?: string
+          tie_breaker_config?: Json | null
+          tournament_format?: string | null
           tournament_id?: string
           updated_at?: string | null
         }
@@ -372,28 +384,34 @@ export type Database = {
         Row: {
           category_id: string
           created_at: string | null
+          group_name: string | null
           id: string
           logo_url: string | null
           name: string
           seed_number: number | null
+          skip_first_phase: boolean | null
           updated_at: string | null
         }
         Insert: {
           category_id: string
           created_at?: string | null
+          group_name?: string | null
           id?: string
           logo_url?: string | null
           name: string
           seed_number?: number | null
+          skip_first_phase?: boolean | null
           updated_at?: string | null
         }
         Update: {
           category_id?: string
           created_at?: string | null
+          group_name?: string | null
           id?: string
           logo_url?: string | null
           name?: string
           seed_number?: number | null
+          skip_first_phase?: boolean | null
           updated_at?: string | null
         }
         Relationships: [

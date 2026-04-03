@@ -8,18 +8,34 @@ type Team = Database['public']['Tables']['teams']['Row'];
 export interface TeamStats {
   team_id: string;
   name: string;
+  matches_played: number;
+  matches_won: number;
+  matches_lost: number;
   sets_won: number;
   sets_lost: number;
   total_points_scored: number;
+  points_conceded: number;
   last_set_points: number;
   last_set_points_conceded: number;
-  points_conceded: number;
   penalties: number;
-  matches_played: number;
   is_winner?: boolean;
 }
 
-export const computeRanking = (teams: Team[], matches: Match[], allSets: SetRecord[]): TeamStats[] => {
+export type TieBreakerCriterion = 
+  | 'MATCHES_WON' 
+  | 'HEAD_TO_HEAD' 
+  | 'SETS_RATIO' 
+  | 'POINTS_RATIO' 
+  | 'TOTAL_POINTS_SCORED' 
+  | 'SETS_WON' 
+  | 'POINTS_CONCEDED';
+
+export const computeRanking = (
+  teams: Team[], 
+  matches: Match[], 
+  allSets: SetRecord[],
+  criteria: TieBreakerCriterion[] = ['MATCHES_WON', 'SETS_RATIO', 'POINTS_RATIO']
+): TeamStats[] => {
   const statsMap: Record<string, TeamStats> = {};
 
   // Initialize
@@ -27,28 +43,32 @@ export const computeRanking = (teams: Team[], matches: Match[], allSets: SetReco
     statsMap[t.id] = {
       team_id: t.id,
       name: t.name,
+      matches_played: 0,
+      matches_won: 0,
+      matches_lost: 0,
       sets_won: 0,
       sets_lost: 0,
       total_points_scored: 0,
+      points_conceded: 0,
       last_set_points: 0,
       last_set_points_conceded: 0,
-      points_conceded: 0,
-      penalties: 0,
-      matches_played: 0
+      penalties: 0
     };
   });
 
   // Process completed matches
-  matches.filter(m => m.status === 'FINISHED').forEach(m => {
+  const finishedMatches = matches.filter(m => m.status === 'FINISHED');
+  
+  finishedMatches.forEach(m => {
     const matchSets = allSets.filter(s => s.match_id === m.id).sort((a, b) => b.set_number - a.set_number);
     
-    if (m.team_a_id) {
-       statsMap[m.team_a_id].matches_played++;
-       if (m.winner_id === m.team_a_id) statsMap[m.team_a_id].is_winner = true;
-    }
-    if (m.team_b_id) {
-       statsMap[m.team_b_id].matches_played++;
-       if (m.winner_id === m.team_b_id) statsMap[m.team_b_id].is_winner = true;
+    if (m.team_a_id) statsMap[m.team_a_id].matches_played++;
+    if (m.team_b_id) statsMap[m.team_b_id].matches_played++;
+
+    if (m.winner_id) {
+      statsMap[m.winner_id].matches_won++;
+      const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
+      if (loserId) statsMap[loserId].matches_lost++;
     }
 
     matchSets.forEach((s, idx) => {
@@ -56,120 +76,150 @@ export const computeRanking = (teams: Team[], matches: Match[], allSets: SetReco
         statsMap[m.team_a_id].total_points_scored += s.points_a;
         statsMap[m.team_a_id].points_conceded += s.points_b;
         if (s.is_finished) {
-           if (s.winner_team_side === 'A') statsMap[m.team_a_id].sets_won++;
-           else statsMap[m.team_a_id].sets_lost++;
+          if (s.winner_team_side === 'A') statsMap[m.team_a_id].sets_won++;
+          else statsMap[m.team_a_id].sets_lost++;
         }
-        // Last set points (index 0 because we sorted by set_number desc)
         if (idx === 0) {
-           statsMap[m.team_a_id].last_set_points = s.points_a;
-           statsMap[m.team_a_id].last_set_points_conceded = s.points_b;
+          statsMap[m.team_a_id].last_set_points = s.points_a;
+          statsMap[m.team_a_id].last_set_points_conceded = s.points_b;
         }
       }
       if (m.team_b_id) {
         statsMap[m.team_b_id].total_points_scored += s.points_b;
         statsMap[m.team_b_id].points_conceded += s.points_a;
         if (s.is_finished) {
-           if (s.winner_team_side === 'B') statsMap[m.team_b_id].sets_won++;
-           else statsMap[m.team_b_id].sets_lost++;
+          if (s.winner_team_side === 'B') statsMap[m.team_b_id].sets_won++;
+          else statsMap[m.team_b_id].sets_lost++;
         }
         if (idx === 0) {
-           statsMap[m.team_b_id].last_set_points = s.points_b;
-           statsMap[m.team_b_id].last_set_points_conceded = s.points_a;
+          statsMap[m.team_b_id].last_set_points = s.points_b;
+          statsMap[m.team_b_id].last_set_points_conceded = s.points_a;
         }
       }
     });
   });
 
-  // Sorting based on criteria (User requested: Sets Lost > Pts Conceded > Last Set Pts Conceded)
+  const getHeadToHead = (teamA: string, teamB: string) => {
+    const match = finishedMatches.find(m => 
+      (m.team_a_id === teamA && m.team_b_id === teamB) || 
+      (m.team_a_id === teamB && m.team_b_id === teamA)
+    );
+    if (!match || !match.winner_id) return 0;
+    return match.winner_id === teamA ? 1 : -1;
+  };
+
+  const getCriterionValue = (stat: TeamStats, criterion: TieBreakerCriterion): number => {
+    switch (criterion) {
+      case 'MATCHES_WON': return stat.matches_won;
+      case 'SETS_WON': return stat.sets_won;
+      case 'SETS_RATIO': return stat.sets_won - stat.sets_lost;
+      case 'POINTS_RATIO': return stat.total_points_scored - stat.points_conceded;
+      case 'TOTAL_POINTS_SCORED': return stat.total_points_scored;
+      case 'POINTS_CONCEDED': return -stat.points_conceded; // Negative because lower is better
+      default: return 0;
+    }
+  };
+
   return Object.values(statsMap).sort((a, b) => {
-    // 1. Sets Won (higher is better) - Important for comparing MC (Losers)
-    if (b.sets_won !== a.sets_won) return b.sets_won - a.sets_won;
-    // 2. Sets Lost (lower is better)
-    if (a.sets_lost !== b.sets_lost) return a.sets_lost - b.sets_lost;
-    // 3. Total Points Scored (higher is better)
-    if (b.total_points_scored !== a.total_points_scored) return b.total_points_scored - a.total_points_scored;
-    // 4. Total Points Conceded (lower is better)
-    if (a.points_conceded !== b.points_conceded) return a.points_conceded - b.points_conceded;
-    // 5. Last Set Points Scored (higher is better)
-    if (b.last_set_points !== a.last_set_points) return b.last_set_points - a.last_set_points;
-    // 6. Last Set Points Conceded (lower is better)
-    if (a.last_set_points_conceded !== b.last_set_points_conceded) return a.last_set_points_conceded - b.last_set_points_conceded;
-    // 7. Penalties (lower is better)
+    for (const criterion of criteria) {
+      if (criterion === 'HEAD_TO_HEAD') {
+        const h2h = getHeadToHead(a.team_id, b.team_id);
+        if (h2h !== 0) return -h2h; // Negative because sort expects (a,b) => b-a for descending
+      } else {
+        const valA = getCriterionValue(a, criterion);
+        const valB = getCriterionValue(b, criterion);
+        if (valB !== valA) return valB - valA;
+      }
+    }
+    // Final tie-breaker: Penalties (lower is better)
     return a.penalties - b.penalties;
   });
 };
 
 export const generateNextPhase = async (categoryId: string, currentPhase: number) => {
   // Fetch current state
+  const { data: category } = await supabase.from('categories').select('*').eq('id', categoryId).single();
   const { data: teams } = await supabase.from('teams').select('*').eq('category_id', categoryId);
   const { data: matches } = await supabase.from('matches').select('*').eq('category_id', categoryId).eq('phase', currentPhase);
   const { data: allSets } = await supabase.from('sets').select('*').in('match_id', (matches || []).map(m => m.id));
 
-  if (!teams || !matches || !allSets) return;
+  if (!category || !teams || !matches || !allSets) return;
 
-  const ranking = computeRanking(teams, matches, allSets);
+  const format = category.tournament_format || 'KNOCKOUT';
+  const advancementRule = category.advancement_rule as any; // e.g. { type: 'TOP_N_PER_GROUP', n: 2 }
+  const tieBreakers = (category.tie_breaker_config as TieBreakerCriterion[]) || ['MATCHES_WON', 'SETS_RATIO', 'POINTS_RATIO'];
 
-  // Split into Winners and Losers for MV and MC logic
-  const winners = ranking.filter(r => r.matches_played > 0 && matches.find(m => m.winner_id === r.team_id));
-  const losers = ranking.filter(r => r.matches_played > 0 && !matches.find(m => m.winner_id === r.team_id));
+  if (format === 'GROUPS' && currentPhase === 1) {
+    // Phase 1 (Groups) -> Phase 2 (Knockout)
+    const groups = Array.from(new Set(teams.map(t => t.group_name).filter(Boolean)));
+    let advancingTeams: TeamStats[] = [];
 
-  if (currentPhase === 1) {
-    // Phase 1 (J1-J5) -> Phase 2 (J6-J8)
-    // J6: 1º MV vs 1º MC (Obrigatoriamente)
-    // J7: 2º MV vs 4º MV
-    // J8: 3º MV vs 5º MV
-    
-    // winners should be 5 teams
-    // losers should be 5 teams
-    const mv = winners; // ranked 1 to 5
-    const mc = losers[0]; // best loser
-
-    const nextMatches = [
-      { num: 6, a: mv[0].team_id, b: mc.team_id },
-      { num: 7, a: mv[1].team_id, b: mv[3].team_id },
-      { num: 8, a: mv[2].team_id, b: mv[4].team_id }
-    ];
-
-    for (const nm of nextMatches) {
-       await supabase.from('matches')
-         .update({ team_a_id: nm.a, team_b_id: nm.b })
-         .eq('category_id', categoryId)
-         .eq('match_number', nm.num);
+    for (const groupName of groups) {
+      const groupTeams = teams.filter(t => t.group_name === groupName);
+      const groupMatches = matches.filter(m => 
+        groupTeams.some(t => t.id === m.team_a_id) && 
+        groupTeams.some(t => t.id === m.team_b_id)
+      );
+      const groupRanking = computeRanking(groupTeams, groupMatches, allSets, tieBreakers);
+      
+      const n = advancementRule?.n || 2;
+      advancingTeams = [...advancingTeams, ...groupRanking.slice(0, n)];
     }
-  } else if (currentPhase === 2) {
-    // Phase 2 (J6-J8) -> Phase 3 (J9-J10) - Semi Final
-    // J9: 1º MV vs 1º MC (Obrigatoriamente)
-    // J10: 2º MV vs 3º MV
-    
-    // Need to rank based on Phase 2 performance
-    // MV = Winners of J6, J7, J8
-    // MC = Best loser of J6, J7, J8
-    const mv = winners;
-    const mc = losers[0];
 
-    const nextMatches = [
-      { num: 9, a: mv[0].team_id, b: mc.team_id },
-      { num: 10, a: mv[1].team_id, b: mv[2].team_id }
-    ];
+    // Now advancingTeams contains the qualifiers. 
+    // We need to pair them for the next knockout phase.
+    // For simplicity, let's pair 1st of A vs 2nd of B, etc.
+    // Or just rank them all together and pair them.
+    const sortedQualifiers = advancingTeams.sort((a, b) => {
+      // Primary tie-breaker here could be their performance in groups
+      if (b.matches_won !== a.matches_won) return b.matches_won - a.matches_won;
+      return (b.sets_won - b.sets_lost) - (a.sets_won - a.sets_lost);
+    });
 
-    for (const nm of nextMatches) {
-       await supabase.from('matches')
-         .update({ team_a_id: nm.a, team_b_id: nm.b })
-         .eq('category_id', categoryId)
-         .eq('match_number', nm.num);
+    const nextMatches = [];
+    let matchNum = matches.length + 1;
+    for (let i = 0; i < sortedQualifiers.length; i += 2) {
+      if (i + 1 < sortedQualifiers.length) {
+        nextMatches.push({
+          category_id: categoryId,
+          team_a_id: sortedQualifiers[i].team_id,
+          team_b_id: sortedQualifiers[i+1].team_id,
+          phase: currentPhase + 1,
+          match_number: matchNum++,
+          status: 'PENDING',
+          is_best_of_5: false
+        });
+      }
     }
-  } else if (currentPhase === 3) {
-    // Phase 3 (J9-J10) -> Phase 4 (J11) - Final
-    // J11: Winner J9 vs Winner J10
-    const nextMatches = [
-      { num: 11, a: winners[0].team_id, b: winners[1].team_id }
-    ];
 
-    for (const nm of nextMatches) {
-       await supabase.from('matches')
-         .update({ team_a_id: nm.a, team_b_id: nm.b })
-         .eq('category_id', categoryId)
-         .eq('match_number', nm.num);
+    if (nextMatches.length > 0) {
+      await supabase.from('matches').insert(nextMatches);
+    }
+  } else if (format === 'KNOCKOUT' || (format === 'GROUPS' && currentPhase > 1)) {
+    // Standard Knockout transition
+    const ranking = computeRanking(teams, matches, allSets, tieBreakers);
+    const winners = ranking.filter(r => r.matches_won > 0); // This is simplified
+
+    const nextMatches = [];
+    let matchNum = (await supabase.from('matches').select('match_number', { count: 'exact' }).eq('category_id', categoryId)).count || 0;
+    matchNum++;
+
+    for (let i = 0; i < winners.length; i += 2) {
+      if (i + 1 < winners.length) {
+        nextMatches.push({
+          category_id: categoryId,
+          team_a_id: winners[i].team_id,
+          team_b_id: winners[i+1].team_id,
+          phase: currentPhase + 1,
+          match_number: matchNum++,
+          status: 'PENDING',
+          is_best_of_5: false
+        });
+      }
+    }
+
+    if (nextMatches.length > 0) {
+      await supabase.from('matches').insert(nextMatches);
     }
   }
 

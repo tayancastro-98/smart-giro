@@ -202,6 +202,34 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
     }
   };
 
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [catFormat, setCatFormat] = useState<'KNOCKOUT' | 'GROUPS'>('KNOCKOUT');
+  const [catGroupSize, setCatGroupSize] = useState<number>(3);
+
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update({
+          tournament_format: catFormat,
+          group_size: catGroupSize,
+          tie_breaker_config: ['SETS_WON', 'POINTS_WON', 'HEAD_TO_HEAD']
+        })
+        .eq('id', editingCategory.id);
+
+      if (error) throw error;
+      alert('Configurações da categoria atualizadas!');
+      setEditingCategory(null);
+      fetchTournaments();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      alert('Erro ao atualizar categoria');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -225,6 +253,58 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
           Novo Torneio
         </button>
       </div>
+
+      {editingCategory && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold mb-4">Configurar Categoria</h3>
+            <form onSubmit={handleUpdateCategory} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Formato do Torneio</label>
+                <select 
+                  value={catFormat}
+                  onChange={(e) => setCatFormat(e.target.value as any)}
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="KNOCKOUT">Mata-Mata Direto</option>
+                  <option value="GROUPS">Fase de Grupos + Mata-Mata</option>
+                </select>
+              </div>
+
+              {catFormat === 'GROUPS' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tamanho dos Grupos (Times por Grupo)</label>
+                  <select 
+                    value={catGroupSize}
+                    onChange={(e) => setCatGroupSize(parseInt(e.target.value))}
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value={3}>3 Times</option>
+                    <option value={4}>4 Times</option>
+                    <option value={5}>5 Times</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setEditingCategory(null)}
+                  className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-primary-500/20"
+                >
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {(isCreating || editingId) && (
         <div className="glass p-6 rounded-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in slide-in-from-top-4">
@@ -283,7 +363,7 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
         <div className="grid grid-cols-1 gap-6">
           {tournaments.map((tournament) => (
             <div key={tournament.id} className="glass p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
+              <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-3">
                   <h3 className="text-xl font-bold">{tournament.name}</h3>
                   <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${
@@ -298,20 +378,38 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
                 </div>
                 {tournament.description && <p className="text-slate-500 text-sm">{tournament.description}</p>}
                 
-                <div className="flex gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                   {tournament.categories?.map(cat => (
-                    <div key={cat.id} className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                      <span className="font-semibold text-primary-600 dark:text-primary-400">
-                        {cat.gender === 'MASCULINE' ? 'Masculino' : 'Feminino'}
-                      </span>
-                      <span className="text-slate-400 px-1">•</span>
-                      <span className="text-slate-500">Fase {cat.current_phase}</span>
+                    <div key={cat.id} className="group relative flex items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary-500 transition-colors">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-slate-100">
+                            {cat.gender === 'MASCULINE' ? 'Masculino' : 'Feminino'}
+                          </span>
+                          <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded uppercase font-bold text-slate-600 dark:text-slate-400">
+                            {cat.tournament_format === 'GROUPS' ? 'Grupos' : 'Mata-Mata'}
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-500">Fase {cat.current_phase} • {cat.group_size ? `Grupos de ${cat.group_size}` : 'Eliminatória'}</span>
+                      </div>
+                      
+                      <button 
+                        onClick={() => {
+                          setEditingCategory(cat);
+                          setCatFormat((cat.tournament_format as any) || 'KNOCKOUT');
+                          setCatGroupSize(cat.group_size || 3);
+                        }}
+                        className="p-2 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all"
+                        title="Configurar Categoria"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="flex md:flex-col gap-2 w-full md:w-auto">
+              <div className="flex md:flex-col gap-2 w-full md:w-auto self-start">
                 {tournament.status === 'DRAFT' && (
                   <button 
                     onClick={() => handleStartTournament(tournament.id)}
