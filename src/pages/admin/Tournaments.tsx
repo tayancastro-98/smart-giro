@@ -205,6 +205,7 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [catFormat, setCatFormat] = useState<'KNOCKOUT' | 'GROUPS'>('KNOCKOUT');
   const [catGroupSize, setCatGroupSize] = useState<number>(3);
+  const [catBestOf, setCatBestOf] = useState<number>(3);
 
   const handleUpdateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,6 +217,7 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
         .update({
           tournament_format: catFormat,
           group_size: catGroupSize,
+          best_of: catBestOf,
           tie_breaker_config: ['SETS_WON', 'POINTS_WON', 'HEAD_TO_HEAD']
         })
         .eq('id', editingCategory.id);
@@ -281,10 +283,23 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
                   >
                     <option value={3}>3 Times</option>
                     <option value={4}>4 Times</option>
-                    <option value={5}>5 Times</option>
                   </select>
                 </div>
               )}
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Duração da Partida (Melhor de)</label>
+                <select 
+                  value={catBestOf}
+                  onChange={(e) => setCatBestOf(parseInt(e.target.value))}
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value={3}>3 Sets (Ganha quem fizer 2)</option>
+                  <option value={5}>5 Sets (Ganha quem fizer 3)</option>
+                  <option value={7}>7 Sets (Ganha quem fizer 4)</option>
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1 ml-1">* Esta configuração será aplicada às novas partidas geradas.</p>
+              </div>
 
               <div className="pt-4 flex gap-3">
                 <button 
@@ -390,7 +405,9 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
                             {cat.tournament_format === 'GROUPS' ? 'Grupos' : 'Mata-Mata'}
                           </span>
                         </div>
-                        <span className="text-xs text-slate-500">Fase {cat.current_phase} • {cat.group_size ? `Grupos de ${cat.group_size}` : 'Eliminatória'}</span>
+                        <span className="text-xs text-slate-500">
+                          Fase {cat.current_phase} • {cat.group_size ? `Grupos de ${cat.group_size}` : 'Eliminatória'} • Melhor de {cat.best_of || 3}
+                        </span>
                       </div>
                       
                       <button 
@@ -398,6 +415,7 @@ Todos os placares e sets serão apagados, mas as equipes e a estrutura do tornei
                           setEditingCategory(cat);
                           setCatFormat((cat.tournament_format as any) || 'KNOCKOUT');
                           setCatGroupSize(cat.group_size || 3);
+                          setCatBestOf(cat.best_of || 3);
                         }}
                         className="p-2 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all"
                         title="Configurar Categoria"

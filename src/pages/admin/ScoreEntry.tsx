@@ -57,7 +57,7 @@ export function ScoreEntry() {
 
   const addSet = () => {
     if (!matchId || !match) return;
-    const maxSets = match.is_best_of_5 ? 5 : 3;
+    const maxSets = match.best_of || 3;
     if (sets.length >= maxSets) return;
     
     setSets([...sets, { 
@@ -109,7 +109,7 @@ export function ScoreEntry() {
       }
     });
 
-    const setsToWin = match?.is_best_of_5 ? 3 : 2;
+    const setsToWin = Math.ceil((match?.best_of || 3) / 2);
     if (setsA >= setsToWin) return match?.team_a_id;
     if (setsB >= setsToWin) return match?.team_b_id;
     return null;
@@ -198,7 +198,7 @@ export function ScoreEntry() {
   if (!match) return null;
 
   const winnerIdCandidate = calculateWinner();
-  const maxSets = match.is_best_of_5 ? 5 : 3;
+  const maxSets = match.best_of || 3;
 
   return (
     <div className="max-w-2xl mx-auto pb-12">
@@ -234,7 +234,7 @@ export function ScoreEntry() {
         
         <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-             {match.is_best_of_5 ? 'Melhor de 5 Sets' : 'Melhor de 3 Sets'}
+             Melhor de {match.best_of || 3} Sets
            </span>
         </div>
       </div>

@@ -163,7 +163,7 @@ export function Matches() {
             }
           });
           const updatedGroups = Object.entries(groupMap).map(([name, teams]) => ({ name, teams }));
-          newMatches = generateGroupStage(selectedCategory.id, updatedGroups);
+          newMatches = generateGroupStage(selectedCategory.id, updatedGroups, selectedCategory.best_of || 3);
         } else {
           // Reconstruct group structure from existing team group_names
           const groupMap: Record<string, Team[]> = {};
@@ -174,10 +174,10 @@ export function Matches() {
             }
           });
           const groups = Object.entries(groupMap).map(([name, teams]) => ({ name, teams }));
-          newMatches = generateGroupStage(selectedCategory.id, groups);
+          newMatches = generateGroupStage(selectedCategory.id, groups, selectedCategory.best_of || 3);
         }
       } else {
-        newMatches = generateKnockoutPhase(selectedCategory.id, teams, 1);
+        newMatches = generateKnockoutPhase(selectedCategory.id, teams, 1, 1, selectedCategory.best_of || 3);
       }
 
       if (!newMatches || newMatches.length === 0) {
@@ -194,6 +194,8 @@ export function Matches() {
           team_a_id: m.team_a_id,
           team_b_id: m.team_b_id,
           group_name: m.group_name,
+          best_of: m.best_of,
+          is_best_of_5: m.is_best_of_5,
           status: 'PENDING'
         }))
       );

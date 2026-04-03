@@ -27,6 +27,7 @@ export type Database = {
           tournament_format: string | null
           tournament_id: string
           updated_at: string | null
+          best_of: number | null
         }
         Insert: {
           advancement_rule?: Json | null
@@ -40,6 +41,7 @@ export type Database = {
           tournament_format?: string | null
           tournament_id: string
           updated_at?: string | null
+          best_of?: number | null
         }
         Update: {
           advancement_rule?: Json | null
@@ -53,6 +55,7 @@ export type Database = {
           tournament_format?: string | null
           tournament_id?: string
           updated_at?: string | null
+          best_of?: number | null
         }
         Relationships: [
           {
@@ -201,6 +204,8 @@ export type Database = {
           team_b_id: string | null
           updated_at: string | null
           winner_id: string | null
+          group_name: string | null
+          best_of: number | null
         }
         Insert: {
           category_id: string
@@ -219,6 +224,8 @@ export type Database = {
           team_b_id?: string | null
           updated_at?: string | null
           winner_id?: string | null
+          group_name?: string | null
+          best_of?: number | null
         }
         Update: {
           category_id?: string
@@ -237,6 +244,8 @@ export type Database = {
           team_b_id?: string | null
           updated_at?: string | null
           winner_id?: string | null
+          group_name?: string | null
+          best_of?: number | null
         }
         Relationships: [
           {

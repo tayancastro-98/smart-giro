@@ -41,7 +41,7 @@ export function createGroups(teams: Team[], groupSize: number): Group[] {
 /**
  * Generates all Round-Robin matches for a set of groups.
  */
-export function generateGroupStage(categoryId: string, groups: Group[]) {
+export function generateGroupStage(categoryId: string, groups: Group[], bestOf: number = 3) {
   const matches = [];
   let matchNumber = 1;
 
@@ -57,7 +57,8 @@ export function generateGroupStage(categoryId: string, groups: Group[]) {
           phase: 1,
           match_number: matchNumber++,
           status: 'PENDING',
-          is_best_of_5: false,
+          is_best_of_5: bestOf === 5,
+          best_of: bestOf,
           group_name: group.name
         });
       }
@@ -70,7 +71,7 @@ export function generateGroupStage(categoryId: string, groups: Group[]) {
 /**
  * Generates a simple Knockout bracket.
  */
-export function generateKnockoutPhase(categoryId: string, teams: Team[], startPhase: number = 1, startMatchNumber: number = 1) {
+export function generateKnockoutPhase(categoryId: string, teams: Team[], startPhase: number = 1, startMatchNumber: number = 1, bestOf: number = 3) {
   const matches = [];
   let matchNumber = startMatchNumber;
 
@@ -84,7 +85,8 @@ export function generateKnockoutPhase(categoryId: string, teams: Team[], startPh
         phase: startPhase,
         match_number: matchNumber++,
         status: 'PENDING',
-        is_best_of_5: false,
+        is_best_of_5: bestOf === 5,
+        best_of: bestOf,
         group_name: null
       });
     }

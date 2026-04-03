@@ -187,7 +187,8 @@ export const generateNextPhase = async (categoryId: string, currentPhase: number
           phase: currentPhase + 1,
           match_number: matchNum++,
           status: 'PENDING',
-          is_best_of_5: false
+          is_best_of_5: (category.best_of || 3) === 5,
+          best_of: category.best_of || 3
         });
       }
     }
@@ -213,7 +214,8 @@ export const generateNextPhase = async (categoryId: string, currentPhase: number
           phase: currentPhase + 1,
           match_number: matchNum++,
           status: 'PENDING',
-          is_best_of_5: false
+          is_best_of_5: (category.best_of || 3) === 5,
+          best_of: category.best_of || 3
         });
       }
     }
